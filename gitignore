@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Secrets - NEVER commit these!
+.env
+*.key
+secrets.txt
+config.ini
+credentials.json
+
+# API Keys (if you accidentally put them in files)
+*secret*
+*token*
+*api_key*
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Optional: If you want to test locally with a subset
+test_verses.csv
