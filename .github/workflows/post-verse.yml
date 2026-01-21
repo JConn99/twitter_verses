@@ -1,1 +1,42 @@
-cron: '0 9 * * *'
+# .github/workflows/post-verse.yml
+name: Post Daily Bible Verse
+
+on:
+  schedule:
+    # Runs at 9:00 AM UTC every day (adjust timezone as needed)
+    - cron: '0 9 * * *'
+  workflow_dispatch:  # Allows manual triggering for testing
+
+jobs:
+  post-verse:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        pip install tweepy
+    
+    - name: Post Bible verse to Twitter
+      env:
+        TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+        TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+        TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+        TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
+      run: |
+        python post_verse.py
+    
+    - name: Commit posted verses tracking file
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add posted_verses.txt posted_verses_*.txt
+        git diff --quiet && git diff --staged --quiet || git commit -m "Update posted verses [skip ci]"
+        git push
