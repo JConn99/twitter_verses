@@ -111,36 +111,45 @@ def create_verse_image(verse_text, reference, output_path='verse_image.png'):
     verse_font = get_font(48)
     ref_font = get_font(36)
     
-    max_width = 50
-    wrapped_text = textwrap.fill(verse_text, width=max_width)
+    # Text wrapping with padding consideration
+    padding = 100  # Left and right padding
+    max_chars_per_line = 40  # Reduced to account for padding
+    wrapped_text = textwrap.fill(verse_text, width=max_chars_per_line)
     
+    # Get text dimensions
     verse_bbox = draw.multiline_textbbox((0, 0), wrapped_text, font=verse_font)
     verse_height = verse_bbox[3] - verse_bbox[1]
-    verse_width = verse_bbox[2] - verse_bbox[0]
     
-    ref_bbox = draw.textbbox((0, 0), f"- {reference}", font=ref_font)
+    ref_text = f"- {reference}"
+    ref_bbox = draw.textbbox((0, 0), ref_text, font=ref_font)
     ref_height = ref_bbox[3] - ref_bbox[1]
-    ref_width = ref_bbox[2] - ref_bbox[0]
     
+    # Calculate vertical positioning (centered)
     total_height = verse_height + 40 + ref_height
     start_y = (height - total_height) // 2
     
-    verse_x = (width - verse_width) // 2
+    # Draw verse text (centered horizontally with padding)
+    verse_x = padding
+    verse_width = width - (padding * 2)
+    
+    # Use anchor='ma' for middle-anchor horizontal centering
     draw.multiline_text(
-        (verse_x, start_y),
+        (width // 2, start_y),
         wrapped_text,
         font=verse_font,
         fill='white',
-        align='center'
+        align='center',
+        anchor='ma'
     )
     
-    ref_x = (width - ref_width) // 2
+    # Draw reference (centered below verse)
     ref_y = start_y + verse_height + 40
     draw.text(
-        (ref_x, ref_y),
-        f"- {reference}",
+        (width // 2, ref_y),
+        ref_text,
         font=ref_font,
-        fill='white'
+        fill='white',
+        anchor='ma'
     )
     
     img.save(output_path, quality=95)
