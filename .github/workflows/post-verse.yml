@@ -3,8 +3,8 @@ name: Post Daily Bible Verse
 
 on:
   schedule:
-    # Runs at 9:00 AM UTC every day (adjust timezone as needed)
-    - cron: '0 9 * * *'
+    # Runs at 2:00 PM UTC every day (8:00 AM Central Time)
+    - cron: '0 14 * * *'
   workflow_dispatch:  # Allows manual triggering for testing
 
 jobs:
