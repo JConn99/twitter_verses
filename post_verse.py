@@ -51,8 +51,8 @@ def format_tweet(verse):
     reference = verse['reference']
     text = verse['text']
     
-    # Basic format: "text" - Reference
-    tweet = f'"{text}" - {reference}'
+    # Format: text - Reference (no quotes)
+    tweet = f'{text} - {reference}'
     
     return tweet
 
