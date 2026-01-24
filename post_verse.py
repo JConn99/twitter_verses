@@ -4,6 +4,8 @@ import random
 import os
 from pathlib import Path
 from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
+import textwrap
 
 def load_verses(csv_file='bible_verses.csv'):
     """Load all Bible verses from CSV file"""
@@ -56,6 +58,94 @@ def format_tweet(verse):
     
     return tweet
 
+def create_gradient(width, height, color1, color2):
+    """Create a vertical gradient from color1 to color2"""
+    base = Image.new('RGB', (width, height), color1)
+    top = Image.new('RGB', (width, height), color2)
+    mask = Image.new('L', (width, height))
+    mask_data = []
+    for y in range(height):
+        mask_data.extend([int(255 * (y / height))] * width)
+    mask.putdata(mask_data)
+    base.paste(top, (0, 0), mask)
+    return base
+
+def get_font(size):
+    """Try to load a nice font, fallback to default if not available"""
+    font_options = [
+        '/System/Library/Fonts/Supplemental/Arial.ttf',
+        '/System/Library/Fonts/Helvetica.ttc',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+        'C:\\Windows\\Fonts\\Arial.ttf',
+        'C:\\Windows\\Fonts\\calibri.ttf',
+    ]
+    
+    for font_path in font_options:
+        try:
+            return ImageFont.truetype(font_path, size)
+        except:
+            continue
+    
+    return ImageFont.load_default()
+
+def create_verse_image(verse_text, reference, output_path='verse_image.png'):
+    """Create an image with verse text and reference on a gradient background"""
+    
+    width = 1200
+    height = 675
+    
+    # Color schemes
+    gradients = [
+        ((41, 128, 185), (52, 73, 94)),    # Peaceful blues
+        ((255, 94, 77), (200, 70, 120)),   # Warm sunset
+        ((106, 17, 203), (37, 117, 252)),  # Purple twilight
+        ((34, 139, 34), (0, 100, 0)),      # Forest green
+        ((0, 150, 136), (0, 105, 92)),     # Ocean teal
+    ]
+    
+    color1, color2 = random.choice(gradients)
+    img = create_gradient(width, height, color1, color2)
+    draw = ImageDraw.Draw(img)
+    
+    verse_font = get_font(48)
+    ref_font = get_font(36)
+    
+    max_width = 50
+    wrapped_text = textwrap.fill(verse_text, width=max_width)
+    
+    verse_bbox = draw.multiline_textbbox((0, 0), wrapped_text, font=verse_font)
+    verse_height = verse_bbox[3] - verse_bbox[1]
+    verse_width = verse_bbox[2] - verse_bbox[0]
+    
+    ref_bbox = draw.textbbox((0, 0), f"- {reference}", font=ref_font)
+    ref_height = ref_bbox[3] - ref_bbox[1]
+    ref_width = ref_bbox[2] - ref_bbox[0]
+    
+    total_height = verse_height + 40 + ref_height
+    start_y = (height - total_height) // 2
+    
+    verse_x = (width - verse_width) // 2
+    draw.multiline_text(
+        (verse_x, start_y),
+        wrapped_text,
+        font=verse_font,
+        fill='white',
+        align='center'
+    )
+    
+    ref_x = (width - ref_width) // 2
+    ref_y = start_y + verse_height + 40
+    draw.text(
+        (ref_x, ref_y),
+        f"- {reference}",
+        font=ref_font,
+        fill='white'
+    )
+    
+    img.save(output_path, quality=95)
+    return output_path
+
 def select_valid_verse(verses, max_attempts=50):
     """Select a random verse that fits within 280 characters and hasn't been posted this year.
     Uses weighted selection to favor top-ranked verses (earlier in the list)."""
@@ -90,16 +180,28 @@ def select_valid_verse(verses, max_attempts=50):
     # If we can't find one after max_attempts, raise an error
     raise Exception(f"Could not find a verse under 280 characters after {max_attempts} attempts")
 
-def post_to_twitter(tweet_text):
-    """Post tweet using Twitter API v2"""
+def post_to_twitter(tweet_text, image_path=None):
+    """Post tweet using Twitter API v2 with optional image"""
     
-    # Get credentials from environment variables
     api_key = os.environ.get('TWITTER_API_KEY')
     api_secret = os.environ.get('TWITTER_API_SECRET')
     access_token = os.environ.get('TWITTER_ACCESS_TOKEN')
     access_token_secret = os.environ.get('TWITTER_ACCESS_TOKEN_SECRET')
     
-    # Authenticate
+    # Authenticate with OAuth 1.0a for media upload
+    auth = tweepy.OAuth1UserHandler(
+        api_key, api_secret, access_token, access_token_secret
+    )
+    api_v1 = tweepy.API(auth)
+    
+    # Upload media if image provided
+    media_id = None
+    if image_path and os.path.exists(image_path):
+        media = api_v1.media_upload(image_path)
+        media_id = media.media_id
+        print(f"Uploaded image with media_id: {media_id}")
+    
+    # Post tweet with image
     client = tweepy.Client(
         consumer_key=api_key,
         consumer_secret=api_secret,
@@ -107,8 +209,11 @@ def post_to_twitter(tweet_text):
         access_token_secret=access_token_secret
     )
     
-    # Post tweet
-    response = client.create_tweet(text=tweet_text)
+    if media_id:
+        response = client.create_tweet(text=tweet_text, media_ids=[media_id])
+    else:
+        response = client.create_tweet(text=tweet_text)
+    
     return response
 
 def main():
@@ -128,10 +233,20 @@ def main():
         print(f"Selected: {verse['reference']}")
         print(f"Tweet text ({len(tweet_text)} chars):\n{tweet_text}")
         
-        # Post to Twitter
-        print("\nPosting to Twitter...")
-        response = post_to_twitter(tweet_text)
+        # Create image
+        print("\nCreating verse image...")
+        image_path = create_verse_image(verse['text'], verse['reference'])
+        print(f"Image created: {image_path}")
+        
+        # Post to Twitter with image
+        print("\nPosting to Twitter with image...")
+        response = post_to_twitter(tweet_text, image_path)
         print(f"Success! Tweet ID: {response.data['id']}")
+        
+        # Clean up image file
+        if os.path.exists(image_path):
+            os.remove(image_path)
+            print("Cleaned up image file")
         
         # Mark this verse as posted
         save_posted_verse(verse['reference'])

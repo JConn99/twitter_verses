@@ -22,7 +22,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install tweepy
+        pip install tweepy Pillow
     
     - name: Post Bible verse to Twitter
       env:
