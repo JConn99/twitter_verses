@@ -70,15 +70,36 @@ def create_gradient(width, height, color1, color2):
     base.paste(top, (0, 0), mask)
     return base
 
-def get_font(size):
+def get_font(size, font_type='verse'):
     """Try to load a nice font, fallback to default if not available"""
+    
+    # Check for custom fonts in fonts/ directory
+    fonts_dir = 'fonts'
+    if os.path.exists(fonts_dir):
+        custom_fonts = [f for f in os.listdir(fonts_dir) 
+                       if f.lower().endswith(('.ttf', '.otf'))]
+        if custom_fonts:
+            # Use first available custom font
+            font_path = os.path.join(fonts_dir, custom_fonts[0])
+            try:
+                return ImageFont.truetype(font_path, size)
+            except:
+                pass
+    
+    # System font options (fallback)
     font_options = [
+        # macOS fonts
         '/System/Library/Fonts/Supplemental/Arial.ttf',
         '/System/Library/Fonts/Helvetica.ttc',
+        '/System/Library/Fonts/Supplemental/Georgia.ttf',
+        # Linux fonts
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
         '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf',
+        # Windows fonts
         'C:\\Windows\\Fonts\\Arial.ttf',
         'C:\\Windows\\Fonts\\calibri.ttf',
+        'C:\\Windows\\Fonts\\Georgia.ttf',
     ]
     
     for font_path in font_options:
@@ -90,30 +111,54 @@ def get_font(size):
     return ImageFont.load_default()
 
 def create_verse_image(verse_text, reference, output_path='verse_image.png'):
-    """Create an image with verse text and reference on a gradient background"""
+    """Create an image with verse text and reference on a background"""
     
     width = 1200
     height = 675
     
-    # Color schemes
-    gradients = [
-        ((41, 128, 185), (52, 73, 94)),    # Peaceful blues
-        ((255, 94, 77), (200, 70, 120)),   # Warm sunset
-        ((106, 17, 203), (37, 117, 252)),  # Purple twilight
-        ((34, 139, 34), (0, 100, 0)),      # Forest green
-        ((0, 150, 136), (0, 105, 92)),     # Ocean teal
-    ]
+    # Check if backgrounds folder exists
+    backgrounds_dir = 'backgrounds'
+    use_image_background = os.path.exists(backgrounds_dir) and os.listdir(backgrounds_dir)
     
-    color1, color2 = random.choice(gradients)
-    img = create_gradient(width, height, color1, color2)
+    if use_image_background:
+        # Load random background image
+        image_files = [f for f in os.listdir(backgrounds_dir) 
+                      if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        if image_files:
+            bg_path = os.path.join(backgrounds_dir, random.choice(image_files))
+            img = Image.open(bg_path)
+            
+            # Resize/crop to fit dimensions
+            img = img.resize((width, height), Image.Resampling.LANCZOS)
+            
+            # Apply dark overlay for text readability (semi-transparent black)
+            overlay = Image.new('RGBA', (width, height), (0, 0, 0, 120))  # 120/255 opacity
+            img = img.convert('RGBA')
+            img = Image.alpha_composite(img, overlay)
+            img = img.convert('RGB')
+        else:
+            use_image_background = False
+    
+    if not use_image_background:
+        # Fallback to gradient backgrounds
+        gradients = [
+            ((41, 128, 185), (52, 73, 94)),    # Peaceful blues
+            ((255, 94, 77), (200, 70, 120)),   # Warm sunset
+            ((106, 17, 203), (37, 117, 252)),  # Purple twilight
+            ((34, 139, 34), (0, 100, 0)),      # Forest green
+            ((0, 150, 136), (0, 105, 92)),     # Ocean teal
+        ]
+        color1, color2 = random.choice(gradients)
+        img = create_gradient(width, height, color1, color2)
+    
     draw = ImageDraw.Draw(img)
     
     verse_font = get_font(48)
     ref_font = get_font(36)
     
     # Text wrapping with padding consideration
-    padding = 100  # Left and right padding
-    max_chars_per_line = 40  # Reduced to account for padding
+    padding = 100
+    max_chars_per_line = 40
     wrapped_text = textwrap.fill(verse_text, width=max_chars_per_line)
     
     # Get text dimensions
@@ -129,10 +174,6 @@ def create_verse_image(verse_text, reference, output_path='verse_image.png'):
     start_y = (height - total_height) // 2
     
     # Draw verse text (centered horizontally with padding)
-    verse_x = padding
-    verse_width = width - (padding * 2)
-    
-    # Use anchor='ma' for middle-anchor horizontal centering
     draw.multiline_text(
         (width // 2, start_y),
         wrapped_text,
